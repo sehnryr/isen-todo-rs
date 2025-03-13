@@ -1,5 +1,7 @@
 use chrono::prelude::*;
 use dioxus::prelude::*;
+use dioxus_sdk::storage::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -14,13 +16,12 @@ enum Route {
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 fn main() {
+    dioxus_sdk::set_dir!();
     dioxus::launch(App);
 }
 
 #[component]
 fn App() -> Element {
-    let _: Signal<Vec<Todo>> = use_context_provider(|| Signal::new(Vec::new()));
-
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         // Router::<Route> {}
@@ -28,7 +29,7 @@ fn App() -> Element {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Todo {
     id: u32,
     title: String,
@@ -42,7 +43,8 @@ struct Todo {
 
 #[component]
 fn TodoList() -> Element {
-    let mut todos = use_context::<Signal<Vec<Todo>>>();
+    let mut todos =
+        use_synced_storage::<LocalStorage, Vec<Todo>>("todo list".to_string(), || Vec::new());
 
     let mut title_value: Signal<String> = use_signal(|| String::new());
     let mut date_value: Signal<Option<DateTime<Utc>>> = use_signal(|| None);
