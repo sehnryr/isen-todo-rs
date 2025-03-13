@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use dioxus::prelude::*;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -10,9 +11,7 @@ enum Route {
     Blog { id: i32 },
 }
 
-const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
-const HEADER_SVG: Asset = asset!("/assets/header.svg");
 
 fn main() {
     dioxus::launch(App);
@@ -20,26 +19,104 @@ fn main() {
 
 #[component]
 fn App() -> Element {
+    let _: Signal<Vec<Todo>> = use_context_provider(|| Signal::new(Vec::new()));
+
     rsx! {
-        document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
-        Router::<Route> {}
+        // Router::<Route> {}
+        TodoList {}
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Todo {
+    id: u32,
+    title: String,
+    due_date: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+    created_by: String,
+    completed: bool,
+    completed_at: Option<DateTime<Utc>>,
+    completed_by: Option<String>,
+}
+
+#[component]
+fn TodoList() -> Element {
+    let mut todos = use_context::<Signal<Vec<Todo>>>();
+
+    let mut title_value: Signal<String> = use_signal(|| String::new());
+    let mut date_value: Signal<Option<DateTime<Utc>>> = use_signal(|| None);
+
+    rsx! {
+        ul { id: "todo-list",
+            for todo in todos.read().iter() {
+                TodoItem { todo: todo.clone() }
+            }
+        }
+        form {
+            input {
+                r#type: "text",
+                required: true,
+                value: title_value,
+                oninput: move |event| {
+                    title_value.set(event.value());
+                },
+            }
+            input {
+                r#type: "date",
+                required: true,
+                value: date_value
+                    .read()
+                    .as_ref()
+                    .map(|date| date.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default(),
+                oninput: move |event| {
+                    let date_str = event.value();
+                    let date = NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").unwrap();
+                    date_value.set(Some(date.and_hms_opt(0, 0, 0).unwrap().and_utc()));
+                },
+            }
+            button {
+                r#type: "submit",
+                onclick: move |event| {
+                    event.prevent_default();
+                    if title_value.read().trim().is_empty() {
+                        return;
+                    }
+                    if date_value.read().is_none() {
+                        return;
+                    }
+                    let title = title_value.take();
+                    let due_date = date_value.take().unwrap();
+                    let new_id = todos.read().len() as u32;
+                    todos
+                        .write()
+                        .push(Todo {
+                            id: new_id,
+                            title: title,
+                            due_date: due_date,
+                            created_at: Utc::now(),
+                            created_by: "".to_string(),
+                            completed: false,
+                            completed_at: None,
+                            completed_by: None,
+                        });
+                },
+                "Add Todo"
+            }
+        }
     }
 }
 
 #[component]
-pub fn Hero() -> Element {
+fn TodoItem(todo: Todo) -> Element {
     rsx! {
-        div {
-            id: "hero",
-            img { src: HEADER_SVG, id: "header" }
-            div { id: "links",
-                a { href: "https://dioxuslabs.com/learn/0.6/", "📚 Learn Dioxus" }
-                a { href: "https://dioxuslabs.com/awesome", "🚀 Awesome Dioxus" }
-                a { href: "https://github.com/dioxus-community/", "📡 Community Libraries" }
-                a { href: "https://github.com/DioxusLabs/sdk", "⚙️ Dioxus Development Kit" }
-                a { href: "https://marketplace.visualstudio.com/items?itemName=DioxusLabs.dioxus", "💫 VSCode Extension" }
-                a { href: "https://discord.gg/XgGxMSkvUM", "👋 Community Discord" }
+        li { id: "todo-item",
+            h2 { "{todo.title}" }
+            p { "{todo.created_at}" }
+            if todo.completed {
+                p { "{todo.completed_at:?}" }
+                p { "{todo.completed_by:?}" }
             }
         }
     }
@@ -49,7 +126,6 @@ pub fn Hero() -> Element {
 #[component]
 fn Home() -> Element {
     rsx! {
-        Hero {}
         Echo {}
     }
 }
@@ -58,23 +134,18 @@ fn Home() -> Element {
 #[component]
 pub fn Blog(id: i32) -> Element {
     rsx! {
-        div {
-            id: "blog",
+        div { id: "blog",
 
             // Content
             h1 { "This is blog #{id}!" }
-            p { "In blog #{id}, we show how the Dioxus router works and how URL parameters can be passed as props to our route components." }
+            p {
+                "In blog #{id}, we show how the Dioxus router works and how URL parameters can be passed as props to our route components."
+            }
 
             // Navigation links
-            Link {
-                to: Route::Blog { id: id - 1 },
-                "Previous"
-            }
+            Link { to: Route::Blog { id: id - 1 }, "Previous" }
             span { " <---> " }
-            Link {
-                to: Route::Blog { id: id + 1 },
-                "Next"
-            }
+            Link { to: Route::Blog { id: id + 1 }, "Next" }
         }
     }
 }
@@ -83,16 +154,9 @@ pub fn Blog(id: i32) -> Element {
 #[component]
 fn Navbar() -> Element {
     rsx! {
-        div {
-            id: "navbar",
-            Link {
-                to: Route::Home {},
-                "Home"
-            }
-            Link {
-                to: Route::Blog { id: 1 },
-                "Blog"
-            }
+        div { id: "navbar",
+            Link { to: Route::Home {}, "Home" }
+            Link { to: Route::Blog { id: 1 }, "Blog" }
         }
 
         Outlet::<Route> {}
@@ -105,12 +169,11 @@ fn Echo() -> Element {
     let mut response = use_signal(|| String::new());
 
     rsx! {
-        div {
-            id: "echo",
+        div { id: "echo",
             h4 { "ServerFn Echo" }
             input {
                 placeholder: "Type here to echo...",
-                oninput:  move |event| async move {
+                oninput: move |event| async move {
                     let data = echo_server(event.value()).await.unwrap();
                     response.set(data);
                 },
@@ -127,7 +190,7 @@ fn Echo() -> Element {
 }
 
 /// Echo the user input on the server.
-#[server(EchoServer)]
+#[server]
 async fn echo_server(input: String) -> Result<String, ServerFnError> {
     Ok(input)
 }
