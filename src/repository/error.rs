@@ -5,8 +5,8 @@ pub enum Error {
     #[error("Sql error: {0}")]
     Sql(#[from] sqlx::Error),
 
-    #[error("Email already exists")]
-    EmailAlreadyExists,
+    #[error("Username already exists")]
+    UsernameAlreadyExists,
 
     #[error("User not found")]
     UserNotFound,

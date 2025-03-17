@@ -23,10 +23,10 @@ static REPOSITORY: LazyLock<Arc<Mutex<Repository>>> =
     LazyLock::new(|| Arc::new(Mutex::new(Repository::new())));
 
 #[server]
-pub async fn login(email: String, password: String) -> Result<(), ServerFnError> {
+pub async fn login(username: String, password: String) -> Result<(), ServerFnError> {
     let session = extract::<Session, _>().await.unwrap();
 
-    let user = REPOSITORY.lock().get_user(email, password).await?;
+    let user = REPOSITORY.lock().get_user(username, password).await?;
 
     session.insert("id", user.id).await?;
 
@@ -34,10 +34,10 @@ pub async fn login(email: String, password: String) -> Result<(), ServerFnError>
 }
 
 #[server]
-pub async fn register(email: String, password: String) -> Result<(), ServerFnError> {
+pub async fn register(username: String, password: String) -> Result<(), ServerFnError> {
     let session = extract::<Session, _>().await.unwrap();
 
-    let user = REPOSITORY.lock().insert_user(email, password).await?;
+    let user = REPOSITORY.lock().insert_user(username, password).await?;
 
     session.insert("id", user.id).await?;
 

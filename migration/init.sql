@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
     id TEXT NOT NULL PRIMARY KEY, -- UUID
-    email TEXT NOT NULL,
+    username TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     deleted_at TEXT DEFAULT NULL -- DATETIME
 );

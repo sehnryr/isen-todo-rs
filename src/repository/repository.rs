@@ -20,14 +20,14 @@ impl Repository {
 
 // users
 impl Repository {
-    async fn is_email_available(&mut self, email: &str) -> Result<bool> {
+    async fn is_username_available(&mut self, username: &str) -> Result<bool> {
         let pool = self.pool.get_ref().await?;
 
         let result = sqlx::query!(
-            "SELECT email FROM users
-            WHERE email = ?
+            "SELECT username FROM users
+            WHERE username = ?
             AND deleted_at IS NULL",
-            email
+            username
         )
         .fetch_optional(pool)
         .await?;
@@ -35,19 +35,19 @@ impl Repository {
         Ok(result.is_none())
     }
 
-    pub async fn insert_user(&mut self, email: String, password: String) -> Result<User> {
-        if !self.is_email_available(&email).await? {
-            return Err(Error::EmailAlreadyExists);
+    pub async fn insert_user(&mut self, username: String, password: String) -> Result<User> {
+        if !self.is_username_available(&username).await? {
+            return Err(Error::UsernameAlreadyExists);
         }
 
         let id = Uuid::new_v4();
         let password_hash = hash_password(&password, SALT);
 
         sqlx::query!(
-            "INSERT INTO users (id, email, password_hash)
+            "INSERT INTO users (id, username, password_hash)
             VALUES (?, ?, ?)",
             id,
-            email,
+            username,
             password_hash
         )
         .execute(self.pool.get_ref().await?)
@@ -55,24 +55,24 @@ impl Repository {
 
         Ok(User {
             id,
-            email,
+            username,
             password_hash,
             deleted_at: None,
         })
     }
 
-    pub async fn get_user(&mut self, email: String, password: String) -> Result<User> {
+    pub async fn get_user(&mut self, username: String, password: String) -> Result<User> {
         let user = sqlx::query_as!(
             User,
             r#"SELECT
                 id as "id: _",
-                email,
+                username,
                 password_hash,
                 deleted_at as "deleted_at: _"
             FROM users
-            WHERE email = ?
+            WHERE username = ?
             AND deleted_at IS NULL"#,
-            email
+            username
         )
         .fetch_optional(self.pool.get_ref().await?)
         .await?;

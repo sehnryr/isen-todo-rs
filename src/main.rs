@@ -270,7 +270,7 @@ fn Login() -> Element {
         return rsx! {};
     }
 
-    let mut email = use_signal(|| String::new());
+    let mut username = use_signal(|| String::new());
     let mut password = use_signal(|| String::new());
 
     let mut message = use_signal(|| String::new());
@@ -281,10 +281,10 @@ fn Login() -> Element {
         }
         form {
             input {
-                r#type: "email",
-                placeholder: "Email",
-                value: email.read().clone(),
-                oninput: move |event| email.set(event.value()),
+                r#type: "text",
+                placeholder: "Username",
+                value: username.read().clone(),
+                oninput: move |event| username.set(event.value()),
             }
             " "
             input {
@@ -299,9 +299,9 @@ fn Login() -> Element {
                 onclick: move |event| {
                     event.prevent_default();
                     async move {
-                        let email = email.read().clone();
+                        let username = username.read().clone();
                         let password = password.read().clone();
-                        if let Err(_) = server::login(email, password).await {
+                        if let Err(_) = server::login(username, password).await {
                             message.set("Login failed".to_owned());
                         } else {
                             auth.set(true);
@@ -324,7 +324,7 @@ fn Register() -> Element {
         return rsx! {};
     }
 
-    let mut email = use_signal(|| String::new());
+    let mut username = use_signal(|| String::new());
     let mut password = use_signal(|| String::new());
 
     let mut message = use_signal(|| String::new());
@@ -335,10 +335,10 @@ fn Register() -> Element {
         }
         form {
             input {
-                r#type: "email",
-                placeholder: "Email",
-                value: email.read().clone(),
-                oninput: move |event| email.set(event.value()),
+                r#type: "text",
+                placeholder: "Username",
+                value: username.read().clone(),
+                oninput: move |event| username.set(event.value()),
             }
             " "
             input {
@@ -353,9 +353,9 @@ fn Register() -> Element {
                 onclick: move |event| {
                     event.prevent_default();
                     async move {
-                        let email = email.read().clone();
+                        let username = username.read().clone();
                         let password = password.read().clone();
-                        if let Err(_) = server::register(email, password).await {
+                        if let Err(_) = server::register(username, password).await {
                             message.set("Registration failed".to_owned());
                         } else {
                             auth.set(true);
