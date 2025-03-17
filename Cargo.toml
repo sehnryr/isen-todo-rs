@@ -10,15 +10,23 @@ edition = "2021"
 chrono = { version = "0.4.40", features = ["serde"] }
 dioxus = { version = "0.6.0", features = ["router", "fullstack"] }
 dioxus-sdk = { version = "0.6.0", features = ["storage"] }
+parking_lot = { version = "0.12.3", optional = true }
 serde = { version = "1.0.219", features = ["derive"] }
+sqlx = { version = "0.8.3", features = [
+    "runtime-tokio",
+    "tls-rustls-ring-webpki",
+    "sqlite",
+    "migrate",
+    "chrono",
+    "uuid",
+], optional = true }
+thiserror = "2.0.12"
+uuid = { version = "1.15.1", features = ["serde", "v4"] }
 
 [features]
 default = ["web"]
 web = ["dioxus/web"]
-desktop = ["dioxus/desktop"]
-mobile = ["dioxus/mobile"]
-
-[profile]
+server = ["dioxus/server", "dep:sqlx", "dep:parking_lot"]
 
 [profile.wasm-dev]
 inherits = "dev"
