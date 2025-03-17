@@ -1,8 +1,11 @@
+#[cfg(feature = "server")]
+use std::sync::{Arc, LazyLock};
+
 use chrono::{DateTime, Utc};
 #[cfg(feature = "server")]
 use parking_lot::Mutex;
 #[cfg(feature = "server")]
-use std::sync::{Arc, LazyLock};
+use tower_sessions::Session;
 use uuid::Uuid;
 
 use dioxus::prelude::*;
@@ -30,6 +33,51 @@ static REPOSITORY: LazyLock<Arc<Mutex<Repository>>> =
 //     let session = REPOSITORY.lock().login_user(email, password).await?;
 //     Ok(session)
 // }
+
+#[server]
+pub async fn login(email: String, password: String) -> Result<(), ServerFnError> {
+    let session = extract::<Session, _>().await.unwrap();
+
+    session.insert("email", email).await?;
+    session.insert("is_authenticated", true).await?;
+
+    Ok(())
+}
+
+#[server]
+pub async fn logout() -> Result<(), ServerFnError> {
+    let session = extract::<Session, _>().await.unwrap();
+
+    session.delete().await?;
+
+    Ok(())
+}
+
+#[server]
+pub async fn register(email: String, password: String) -> Result<(), ServerFnError> {
+    let session = extract::<Session, _>().await.unwrap();
+
+    session.insert("email", email).await?;
+    session.insert("is_authenticated", true).await?;
+
+    Ok(())
+}
+
+#[server]
+pub async fn protected() -> Result<String, ServerFnError> {
+    let session = extract::<Session, _>().await.unwrap();
+    let is_auth: Option<bool> = session.get("is_authenticated").await?;
+
+    if is_auth.unwrap_or(false) {
+        let username: Option<String> = session.get("username").await?;
+        Ok(format!(
+            "Hello, {}! You have access to protected content.",
+            username.unwrap_or_else(|| "Guest".into())
+        ))
+    } else {
+        Ok("Unauthorized access".to_string())
+    }
+}
 
 #[server]
 pub async fn create_list(title: String) -> Result<(), ServerFnError> {

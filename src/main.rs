@@ -21,21 +21,48 @@ enum Route {
     Home {},
     #[route("/lists/:id")]
     Lists { id: Uuid },
-    // #[route("/user/login")]
-    // Login {},
-    // #[route("/user/register")]
-    // Register {},
+    #[route("/user/login")]
+    Login {},
+    #[route("/user/register")]
+    Register {},
 }
 
+#[cfg(not(feature = "server"))]
 fn main() {
     dioxus_sdk::set_dir!();
     dioxus::launch(App);
 }
 
+#[cfg(feature = "server")]
+#[tokio::main]
+async fn main() {
+    use axum::Router;
+    use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false)
+        .with_expiry(Expiry::OnSessionEnd);
+
+    let router = Router::new()
+        .serve_dioxus_application(ServeConfigBuilder::default(), App)
+        .layer(session_layer)
+        .into_make_service();
+
+    let socket_addr = dioxus::cli_config::fullstack_address_or_localhost();
+
+    let listener = tokio::net::TcpListener::bind(socket_addr)
+        .await
+        .expect("Failed to bind to socket address");
+
+    axum::serve(listener, router)
+        .await
+        .expect("Failed to serve");
+}
+
 #[component]
 fn App() -> Element {
-    // let _session_token =
-    //     use_synced_storage::<LocalStorage, Option<Session>>("session_token".to_string(), || None);
+    use_context_provider(|| Signal::new(false));
 
     rsx! {
         Router::<Route> {}
@@ -44,18 +71,24 @@ fn App() -> Element {
 
 #[component]
 fn Navbar() -> Element {
-    // let session_token =
-    //     use_synced_storage::<LocalStorage, Option<Session>>("session_token".to_string(), || None);
+    let mut auth = use_context::<Signal<bool>>();
 
     rsx! {
         nav {
             Link { to: Route::Home {}, "Home" }
-                // if session_token.read().is_some() {
-        //     button { "Log out" }
-        // } else {
-        //     Link { to: Route::Login {}, "Login" }
-        //     Link { to: Route::Register {}, "Register" }
-        // }
+            if auth.read().clone() {
+                button {
+                    onclick: move |_| async move {
+                        server::logout().await.expect("Failed to logout");
+                        auth.set(false);
+                        navigator().replace(Route::Home {});
+                    },
+                    "Log out"
+                }
+            } else {
+                Link { to: Route::Login {}, "Login" }
+                Link { to: Route::Register {}, "Register" }
+            }
         }
 
         Outlet::<Route> {}
@@ -213,66 +246,106 @@ fn Lists(id: Uuid) -> Element {
     }
 }
 
-// #[component]
-// fn Login() -> Element {
-//     rsx! {}
-// }
+#[component]
+fn Login() -> Element {
+    let mut auth = use_context::<Signal<bool>>();
 
-// #[component]
-// fn Register() -> Element {
-//     let mut session_token =
-//         use_synced_storage::<LocalStorage, Option<Session>>("session_token".to_string(), || None);
+    if auth.read().clone() {
+        navigator().replace(Route::Home {});
+        return rsx! {};
+    }
 
-//     if session_token.read().is_some() {
-//         navigator().push(Route::Home {});
-//     }
+    let mut email = use_signal(|| String::new());
+    let mut password = use_signal(|| String::new());
 
-//     let mut email = use_signal(|| String::new());
-//     let mut password = use_signal(|| String::new());
+    let mut message = use_signal(|| String::new());
 
-//     let mut error_message = use_signal(|| String::new());
+    rsx! {
+        if !message.read().is_empty() {
+            p { "{message}" }
+        }
+        form {
+            input {
+                r#type: "email",
+                placeholder: "Email",
+                value: email.read().clone(),
+                oninput: move |event| email.set(event.value()),
+            }
+            input {
+                r#type: "password",
+                placeholder: "Password",
+                value: password.read().clone(),
+                oninput: move |event| password.set(event.value()),
+            }
+            button {
+                r#type: "submit",
+                onclick: move |event| {
+                    event.prevent_default();
+                    async move {
+                        let email = email.read().clone();
+                        let password = password.read().clone();
+                        if let Err(_) = server::login(email, password).await {
+                            message.set("Login failed".to_owned());
+                        } else {
+                            auth.set(true);
+                            navigator().push(Route::Home {});
+                        }
+                    }
+                },
+                "Login"
+            }
+        }
+    }
+}
 
-//     let handle = move |email: String, password: String| async move {
-//         if let Err(err) = server::register_user(email.clone(), password.clone()).await {
-//             error_message.set(err.to_string());
-//             return;
-//         }
-//         error_message.set(String::new());
+#[component]
+fn Register() -> Element {
+    let mut auth = use_context::<Signal<bool>>();
 
-//         let new_session = server::login_user(email, password)
-//             .await
-//             .expect("Failed to login");
-//         session_token.set(Some(new_session));
-//         navigator().push(Route::Home {});
-//     };
+    if auth.read().clone() {
+        navigator().replace(Route::Home {});
+        return rsx! {};
+    }
 
-//     rsx! {
-//         if !error_message.read().is_empty() {
-//             span {
-//                 color: "red",
-//                 "{error_message}"
-//             }
-//         }
-//         form {
-//             input {
-//                 name: "email",
-//                 r#type: "email",
-//                 placeholder: "Email",
-//                 oninput: move |event| email.set(event.value()),
-//             }
-//             input {
-//                 name: "password",
-//                 r#type: "password",
-//                 placeholder: "Password",
-//                 oninput: move |event| password.set(event.value()),
-//             }
-//             button {
-//                 onclick: move |event| async move {
-//                     event.prevent_default();
-//                     handle(email.read().clone(), password.read().clone()).await;
-//                 },
-//                 "Register"
-//             }
-//         }
-//     }
-// }
+    let mut email = use_signal(|| String::new());
+    let mut password = use_signal(|| String::new());
+
+    let mut message = use_signal(|| String::new());
+
+    rsx! {
+        if !message.read().is_empty() {
+            p { "{message}" }
+        }
+        form {
+            input {
+                r#type: "email",
+                placeholder: "Email",
+                value: email.read().clone(),
+                oninput: move |event| email.set(event.value()),
+            }
+            input {
+                r#type: "password",
+                placeholder: "Password",
+                value: password.read().clone(),
+                oninput: move |event| password.set(event.value()),
+            }
+            button {
+                r#type: "submit",
+                onclick: move |event| {
+                    event.prevent_default();
+                    async move {
+                        let email = email.read().clone();
+                        let password = password.read().clone();
+                        if let Err(_) = server::register(email, password).await {
+                            message.set("Registration failed".to_owned());
+                        } else {
+                            auth.set(true);
+                            navigator().push(Route::Home {});
+                        }
+                    }
+                },
+                "Register"
+            }
+        }
+    }
+}

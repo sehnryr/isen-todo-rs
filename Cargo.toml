@@ -7,8 +7,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = { version = "0.7.9", optional = true }
 chrono = { version = "0.4.40", features = ["serde"] }
-dioxus = { version = "0.6.0", features = ["router", "fullstack"] }
+dioxus = { version = "0.6.3", features = ["router", "fullstack"] }
 dioxus-sdk = { version = "0.6.0", features = ["storage"] }
 parking_lot = { version = "0.12.3", optional = true }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -21,12 +22,21 @@ sqlx = { version = "0.8.3", features = [
     "uuid",
 ], optional = true }
 thiserror = "2.0.12"
+tokio = { version = "1.44.1", optional = true }
+tower-sessions = { version = "0.13.0", optional = true }
 uuid = { version = "1.15.1", features = ["serde", "v4"] }
 
 [features]
 default = ["web"]
 web = ["dioxus/web"]
-server = ["dioxus/server", "dep:sqlx", "dep:parking_lot"]
+server = [
+    "dioxus/server",
+    "dep:axum",
+    "dep:parking_lot",
+    "dep:sqlx",
+    "dep:tokio",
+    "dep:tower-sessions",
+]
 
 [profile.wasm-dev]
 inherits = "dev"
