@@ -14,7 +14,7 @@ pub struct List {
     pub id: Uuid,
     pub title: String,
     pub created_at: DateTime<Utc>,
-    // pub created_by: Uuid,
+    pub created_by: Uuid,
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
@@ -25,9 +25,9 @@ pub struct Task {
     pub title: String,
     pub due_date: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
-    // pub created_by: Uuid,
+    pub created_by: Uuid,
     pub completed_at: Option<DateTime<Utc>>,
-    // pub completed_by: Option<Uuid>,
+    pub completed_by: Option<String>,
 }
 
 // #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

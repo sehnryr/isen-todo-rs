@@ -208,10 +208,16 @@ fn Lists(id: Uuid) -> Element {
                         "Due on: "
                         span { {task.due_date.format("%Y-%m-%d").to_string()} }
                     }
-                    if let Some(completed_at) = task.completed_at {
+                    if let (Some(completed_at), Some(completed_by)) = (
+                        task.completed_at,
+                        task.completed_by,
+                    )
+                    {
                         div {
                             "Completed at: "
                             span { {completed_at.format("%Y-%m-%d %H:%M:%S").to_string()} }
+                            " by "
+                            span { {completed_by.to_string()} }
                         }
                     }
                 }

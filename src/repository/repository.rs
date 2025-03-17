@@ -108,6 +108,7 @@ impl Repository {
                 id as "id: _",
                 title,
                 created_at as "created_at: _",
+                created_by as "created_by: _",
                 deleted_at as "deleted_at: _"
             FROM lists
             WHERE deleted_at IS NULL
@@ -223,13 +224,16 @@ impl Repository {
         let rows = sqlx::query_as!(
             Task,
             r#"SELECT
-                id as "id: _",
+                tasks.id as "id: _",
                 list_id as "list_id: _",
                 title,
                 due_date as "due_date: _",
                 created_at as "created_at: _",
-                completed_at as "completed_at: _"
+                created_by as "created_by: _",
+                completed_at as "completed_at: _",
+                users.username as "completed_by: _"
             FROM tasks
+            LEFT JOIN users ON tasks.completed_by = users.id
             WHERE list_id = ?"#,
             list_id
         )
