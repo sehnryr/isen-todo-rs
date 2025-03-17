@@ -7,7 +7,6 @@ pub struct User {
     pub id: Uuid,
     pub username: String,
     pub password_hash: String,
-    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

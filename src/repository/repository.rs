@@ -25,8 +25,7 @@ impl Repository {
 
         let result = sqlx::query!(
             "SELECT username FROM users
-            WHERE username = ?
-            AND deleted_at IS NULL",
+            WHERE username = ?",
             username
         )
         .fetch_optional(pool)
@@ -57,7 +56,6 @@ impl Repository {
             id,
             username,
             password_hash,
-            deleted_at: None,
         })
     }
 
@@ -67,11 +65,9 @@ impl Repository {
             r#"SELECT
                 id as "id: _",
                 username,
-                password_hash,
-                deleted_at as "deleted_at: _"
+                password_hash
             FROM users
-            WHERE username = ?
-            AND deleted_at IS NULL"#,
+            WHERE username = ?"#,
             username
         )
         .fetch_optional(self.pool.get_ref().await?)
@@ -82,22 +78,6 @@ impl Repository {
             Some(_) => Err(Error::InvalidCredentials),
             None => Err(Error::UserNotFound),
         }
-    }
-
-    pub async fn delete_user(&mut self, user_id: Uuid) -> Result<()> {
-        let deleted_at = Utc::now();
-
-        sqlx::query!(
-            "UPDATE users SET deleted_at = ?
-            WHERE id = ?
-            AND deleted_at IS NULL",
-            deleted_at,
-            user_id
-        )
-        .execute(self.pool.get_ref().await?)
-        .await?;
-
-        Ok(())
     }
 }
 
