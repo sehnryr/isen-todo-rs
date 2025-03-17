@@ -7,10 +7,11 @@ mod util;
 
 use chrono::NaiveDate;
 use dioxus::prelude::*;
-// use dioxus_sdk::storage::*;
+use dioxus_sdk::storage::*;
+use model::db::Task;
 use uuid::Uuid;
 
-// use crate::model::db::Session;
+use crate::model::db::List;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -74,8 +75,10 @@ fn Home() -> Element {
     //     };
     // }
 
+    let mut lists =
+        use_synced_storage::<LocalStorage, Vec<List>>("lists".to_string(), || Vec::new());
+
     let mut list_name = use_signal(|| String::new());
-    let mut lists = use_signal(|| Vec::new());
 
     let update_lists = move || async move {
         lists.set(server::get_lists().await.expect("Failed to get lists"));
@@ -126,10 +129,11 @@ fn Home() -> Element {
 
 #[component]
 fn Lists(id: Uuid) -> Element {
+    let mut tasks =
+        use_synced_storage::<LocalStorage, Vec<Task>>(format!("tasks_{}", id), || Vec::new());
+
     let mut task_name = use_signal(|| String::new());
     let mut due_date = use_signal(|| String::new());
-
-    let mut tasks = use_signal(|| Vec::new());
 
     let update_tasks = move || async move {
         tasks.set(server::get_tasks(id).await.expect("Failed to get tasks"));

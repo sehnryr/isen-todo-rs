@@ -10,7 +10,7 @@ use uuid::Uuid;
 //     pub deleted_at: Option<DateTime<Utc>>,
 // }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct List {
     pub id: Uuid,
     pub title: String,
@@ -25,7 +25,7 @@ pub struct List {
 //     pub user_id: Uuid,
 // }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
     pub id: Uuid,
     pub list_id: Uuid,
