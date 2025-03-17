@@ -5,6 +5,7 @@ mod repository;
 mod server;
 mod util;
 
+use chrono::NaiveDate;
 use dioxus::prelude::*;
 // use dioxus_sdk::storage::*;
 use uuid::Uuid;
@@ -125,8 +126,86 @@ fn Home() -> Element {
 
 #[component]
 fn Lists(id: Uuid) -> Element {
+    let mut task_name = use_signal(|| String::new());
+    let mut due_date = use_signal(|| String::new());
+
+    let mut tasks = use_signal(|| Vec::new());
+
+    let update_tasks = move || async move {
+        tasks.set(server::get_tasks(id).await.expect("Failed to get tasks"));
+    };
+
+    use_future(update_tasks);
+
     rsx! {
-        p { "{id}" }
+        ul {
+            for task in tasks.read().clone() {
+                li {
+                    input {
+                        r#type: "checkbox",
+                        checked: "{task.completed_at.is_some()}",
+                        onchange: move |_| {
+                            async move {
+                                server::toggle_task_completion(task.id)
+                                    .await
+                                    .expect("Failed to update task");
+                                update_tasks().await;
+                            }
+                        },
+                    }
+                    span { "{task.title}" }
+                    div {
+                        "Due on: "
+                        span { {task.due_date.format("%Y-%m-%d").to_string()} }
+                    }
+                    if let Some(completed_at) = task.completed_at {
+                        div {
+                            "Completed at: "
+                            span { {completed_at.format("%Y-%m-%d %H:%M:%S").to_string()} }
+                        }
+                    }
+                }
+            }
+        }
+        form {
+            input {
+                r#type: "text",
+                placeholder: "task name",
+                value: "{task_name}",
+                oninput: move |event| task_name.set(event.value()),
+            }
+            input {
+                r#type: "date",
+                placeholder: "due date",
+                value: "{due_date}",
+                oninput: move |event| due_date.set(event.value()),
+            }
+            button {
+                r#type: "submit",
+                onclick: move |event| {
+                    event.prevent_default();
+                    async move {
+                        if task_name.read().is_empty() {
+                            return;
+                        }
+                        if due_date.read().is_empty() {
+                            return;
+                        }
+                        let due_date = NaiveDate::parse_from_str(
+                                due_date.read().as_str(),
+                                "%Y-%m-%d",
+                            )
+                            .expect("Failed to parse due date");
+                        let due_date = due_date.and_hms_opt(0, 0, 0).unwrap().and_utc();
+                        server::create_task(id, task_name.read().clone(), due_date)
+                            .await
+                            .expect("Failed to create list");
+                        update_tasks().await;
+                    }
+                },
+                "Create"
+            }
+        }
     }
 }
 
