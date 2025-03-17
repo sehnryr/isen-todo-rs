@@ -81,7 +81,7 @@ fn Navbar() -> Element {
                     onclick: move |_| async move {
                         server::logout().await.expect("Failed to logout");
                         auth.set(false);
-                        navigator().replace(Route::Home {});
+                        navigator().push(Route::Home {});
                     },
                     "Log out"
                 }
@@ -97,16 +97,16 @@ fn Navbar() -> Element {
 
 #[component]
 fn Home() -> Element {
-    // let session_token =
-    //     use_synced_storage::<LocalStorage, Option<Session>>("session_token".to_string(), || None);
+    let auth = use_context::<Signal<bool>>();
 
-    // if session_token.read().is_none() {
-    //     return rsx! {
-    //         div {
-    //             p { "log in or register to continue." }
-    //         }
-    //     };
-    // }
+    if !auth.read().clone() {
+        return rsx! {
+            div {
+                h1 { "Welcome!" }
+                p { "Please log in or register to continue." }
+            }
+        };
+    }
 
     let mut lists =
         use_synced_storage::<LocalStorage, Vec<List>>("lists".to_string(), || Vec::new());
@@ -162,6 +162,13 @@ fn Home() -> Element {
 
 #[component]
 fn Lists(id: Uuid) -> Element {
+    let auth = use_context::<Signal<bool>>();
+
+    if !auth.read().clone() {
+        navigator().push(Route::Home {});
+        return rsx! {};
+    }
+
     let mut tasks =
         use_synced_storage::<LocalStorage, Vec<Task>>(format!("tasks_{}", id), || Vec::new());
 
@@ -251,7 +258,7 @@ fn Login() -> Element {
     let mut auth = use_context::<Signal<bool>>();
 
     if auth.read().clone() {
-        navigator().replace(Route::Home {});
+        navigator().push(Route::Home {});
         return rsx! {};
     }
 
@@ -303,7 +310,7 @@ fn Register() -> Element {
     let mut auth = use_context::<Signal<bool>>();
 
     if auth.read().clone() {
-        navigator().replace(Route::Home {});
+        navigator().push(Route::Home {});
         return rsx! {};
     }
 

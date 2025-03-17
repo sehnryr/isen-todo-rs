@@ -103,16 +103,17 @@ impl Repository {
 
 // lists
 impl Repository {
-    pub async fn create_list(&mut self, title: String) -> Result<()> {
+    pub async fn create_list(&mut self, title: String, user_id: Uuid) -> Result<()> {
         let id = Uuid::new_v4();
         let created_at = Utc::now();
 
         sqlx::query!(
-            "INSERT INTO lists (id, title, created_at)
-            VALUES (?, ?, ?)",
+            "INSERT INTO lists (id, title, created_at, created_by)
+            VALUES (?, ?, ?, ?)",
             id,
             title,
-            created_at
+            created_at,
+            user_id
         )
         .execute(self.pool.get_ref().await?)
         .await?;
@@ -120,7 +121,7 @@ impl Repository {
         Ok(())
     }
 
-    pub async fn get_lists(&mut self) -> Result<Vec<List>> {
+    pub async fn get_lists(&mut self, user_id: Uuid) -> Result<Vec<List>> {
         let result = sqlx::query_as!(
             List,
             r#"SELECT
@@ -129,7 +130,9 @@ impl Repository {
                 created_at as "created_at: _",
                 deleted_at as "deleted_at: _"
             FROM lists
-            WHERE deleted_at IS NULL"#,
+            WHERE deleted_at IS NULL
+            AND created_by = ?"#,
+            user_id
         )
         .fetch_all(self.pool.get_ref().await?)
         .await?;
@@ -137,34 +140,17 @@ impl Repository {
         Ok(result)
     }
 
-    pub async fn get_list(&mut self, list_id: Uuid) -> Result<List> {
-        let result = sqlx::query_as!(
-            List,
-            r#"SELECT
-                id as "id: _",
-                title,
-                created_at as "created_at: _",
-                deleted_at as "deleted_at: _"
-            FROM lists
-            WHERE id = ?
-            AND deleted_at IS NULL"#,
-            list_id
-        )
-        .fetch_one(self.pool.get_ref().await?)
-        .await?;
-
-        Ok(result)
-    }
-
-    pub async fn delete_list(&mut self, list_id: Uuid) -> Result<()> {
+    pub async fn delete_list(&mut self, list_id: Uuid, user_id: Uuid) -> Result<()> {
         let deleted_at = Utc::now();
 
         sqlx::query!(
             "UPDATE lists SET deleted_at = ?
             WHERE id = ?
-            AND deleted_at IS NULL",
+            AND deleted_at IS NULL
+            AND created_by = ?",
             deleted_at,
-            list_id
+            list_id,
+            user_id
         )
         .execute(self.pool.get_ref().await?)
         .await?;
@@ -232,18 +218,20 @@ impl Repository {
         list_id: Uuid,
         title: String,
         due_date: DateTime<Utc>,
+        user_id: Uuid,
     ) -> Result<()> {
         let task_id = Uuid::new_v4();
         let created_at = Utc::now();
 
         sqlx::query!(
-            r#"INSERT INTO tasks (id, list_id, title, due_date, created_at)
-            VALUES (?, ?, ?, ?, ?)"#,
+            r#"INSERT INTO tasks (id, list_id, title, due_date, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?)"#,
             task_id,
             list_id,
             title,
             due_date,
-            created_at
+            created_at,
+            user_id
         )
         .execute(self.pool.get_ref().await?)
         .await?;
@@ -271,7 +259,7 @@ impl Repository {
         Ok(rows)
     }
 
-    pub async fn toggle_task_completion(&mut self, task_id: Uuid) -> Result<()> {
+    pub async fn toggle_task_completion(&mut self, task_id: Uuid, user_id: Uuid) -> Result<()> {
         let completed_at = Utc::now();
 
         sqlx::query!(
@@ -279,9 +267,14 @@ impl Repository {
             SET completed_at = CASE
                 WHEN completed_at IS NULL THEN ?
                 ELSE NULL
+            END,
+            completed_by = CASE
+                WHEN completed_by IS NULL THEN ?
+                ELSE NULL
             END
             WHERE id = ?"#,
             completed_at,
+            user_id,
             task_id
         )
         .execute(self.pool.get_ref().await?)

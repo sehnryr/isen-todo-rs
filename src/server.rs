@@ -55,25 +55,28 @@ pub async fn logout() -> Result<(), ServerFnError> {
 
 #[server]
 pub async fn create_list(title: String) -> Result<(), ServerFnError> {
-    REPOSITORY.lock().create_list(title).await?;
+    let session = extract::<Session, _>().await.unwrap();
+    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+
+    REPOSITORY.lock().create_list(title, user_id).await?;
     Ok(())
 }
 
 #[server]
 pub async fn get_lists() -> Result<Vec<List>, ServerFnError> {
-    let lists = REPOSITORY.lock().get_lists().await?;
+    let session = extract::<Session, _>().await.unwrap();
+    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+
+    let lists = REPOSITORY.lock().get_lists(user_id).await?;
     Ok(lists)
 }
 
 #[server]
-pub async fn get_list(id: Uuid) -> Result<List, ServerFnError> {
-    let list = REPOSITORY.lock().get_list(id).await?;
-    Ok(list)
-}
-
-#[server]
 pub async fn delete_list(id: Uuid) -> Result<(), ServerFnError> {
-    REPOSITORY.lock().delete_list(id).await?;
+    let session = extract::<Session, _>().await.unwrap();
+    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+
+    REPOSITORY.lock().delete_list(id, user_id).await?;
     Ok(())
 }
 
@@ -83,9 +86,12 @@ pub async fn create_task(
     title: String,
     due_date: DateTime<Utc>,
 ) -> Result<(), ServerFnError> {
+    let session = extract::<Session, _>().await.unwrap();
+    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+
     REPOSITORY
         .lock()
-        .create_task(list_id, title, due_date)
+        .create_task(list_id, title, due_date, user_id)
         .await?;
     Ok(())
 }
@@ -98,6 +104,12 @@ pub async fn get_tasks(id: Uuid) -> Result<Vec<Task>, ServerFnError> {
 
 #[server]
 pub async fn toggle_task_completion(id: Uuid) -> Result<(), ServerFnError> {
-    REPOSITORY.lock().toggle_task_completion(id).await?;
+    let session = extract::<Session, _>().await.unwrap();
+    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+
+    REPOSITORY
+        .lock()
+        .toggle_task_completion(id, user_id)
+        .await?;
     Ok(())
 }
