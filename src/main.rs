@@ -77,6 +77,7 @@ fn Navbar() -> Element {
         nav {
             Link { to: Route::Home {}, "Home" }
             if auth.read().clone() {
+                " "
                 button {
                     onclick: move |_| async move {
                         server::logout().await.expect("Failed to logout");
@@ -86,7 +87,9 @@ fn Navbar() -> Element {
                     "Log out"
                 }
             } else {
+                " "
                 Link { to: Route::Login {}, "Login" }
+                " "
                 Link { to: Route::Register {}, "Register" }
             }
         }
@@ -124,6 +127,7 @@ fn Home() -> Element {
             for list in lists.read().clone() {
                 li {
                     Link { to: Route::Lists { id: list.id }, "{list.title}" }
+                    " "
                     button {
                         onclick: move |_| {
                             async move {
@@ -143,6 +147,7 @@ fn Home() -> Element {
                 value: "{list_name}",
                 oninput: move |event| list_name.set(event.value()),
             }
+            " "
             button {
                 r#type: "submit",
                 onclick: move |event| {
@@ -197,6 +202,7 @@ fn Lists(id: Uuid) -> Element {
                             }
                         },
                     }
+                    " "
                     span { "{task.title}" }
                     div {
                         "Due on: "
@@ -218,12 +224,14 @@ fn Lists(id: Uuid) -> Element {
                 value: "{task_name}",
                 oninput: move |event| task_name.set(event.value()),
             }
+            " "
             input {
                 r#type: "date",
                 placeholder: "due date",
                 value: "{due_date}",
                 oninput: move |event| due_date.set(event.value()),
             }
+            " "
             button {
                 r#type: "submit",
                 onclick: move |event| {
@@ -278,12 +286,14 @@ fn Login() -> Element {
                 value: email.read().clone(),
                 oninput: move |event| email.set(event.value()),
             }
+            " "
             input {
                 r#type: "password",
                 placeholder: "Password",
                 value: password.read().clone(),
                 oninput: move |event| password.set(event.value()),
             }
+            " "
             button {
                 r#type: "submit",
                 onclick: move |event| {
@@ -330,12 +340,14 @@ fn Register() -> Element {
                 value: email.read().clone(),
                 oninput: move |event| email.set(event.value()),
             }
+            " "
             input {
                 r#type: "password",
                 placeholder: "Password",
                 value: password.read().clone(),
                 oninput: move |event| password.set(event.value()),
             }
+            " "
             button {
                 r#type: "submit",
                 onclick: move |event| {
