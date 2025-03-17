@@ -22,24 +22,24 @@ pub const SALT: &str = "salt";
 static REPOSITORY: LazyLock<Arc<Mutex<Repository>>> =
     LazyLock::new(|| Arc::new(Mutex::new(Repository::new())));
 
-// #[server]
-// pub async fn register_user(email: String, password: String) -> Result<(), ServerFnError> {
-//     REPOSITORY.lock().insert_user(email, password).await?;
-//     Ok(())
-// }
-
-// #[server]
-// pub async fn login_user(email: String, password: String) -> Result<Session, ServerFnError> {
-//     let session = REPOSITORY.lock().login_user(email, password).await?;
-//     Ok(session)
-// }
-
 #[server]
 pub async fn login(email: String, password: String) -> Result<(), ServerFnError> {
     let session = extract::<Session, _>().await.unwrap();
 
-    session.insert("email", email).await?;
-    session.insert("is_authenticated", true).await?;
+    let user = REPOSITORY.lock().get_user(email, password).await?;
+
+    session.insert("id", user.id).await?;
+
+    Ok(())
+}
+
+#[server]
+pub async fn register(email: String, password: String) -> Result<(), ServerFnError> {
+    let session = extract::<Session, _>().await.unwrap();
+
+    let user = REPOSITORY.lock().insert_user(email, password).await?;
+
+    session.insert("id", user.id).await?;
 
     Ok(())
 }
@@ -51,32 +51,6 @@ pub async fn logout() -> Result<(), ServerFnError> {
     session.delete().await?;
 
     Ok(())
-}
-
-#[server]
-pub async fn register(email: String, password: String) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-
-    session.insert("email", email).await?;
-    session.insert("is_authenticated", true).await?;
-
-    Ok(())
-}
-
-#[server]
-pub async fn protected() -> Result<String, ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-    let is_auth: Option<bool> = session.get("is_authenticated").await?;
-
-    if is_auth.unwrap_or(false) {
-        let username: Option<String> = session.get("username").await?;
-        Ok(format!(
-            "Hello, {}! You have access to protected content.",
-            username.unwrap_or_else(|| "Guest".into())
-        ))
-    } else {
-        Ok("Unauthorized access".to_string())
-    }
 }
 
 #[server]

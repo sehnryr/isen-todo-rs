@@ -2,13 +2,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-// #[derive(Serialize, Deserialize)]
-// pub struct User {
-//     pub id: Uuid,
-//     pub email: String,
-//     pub password_hash: String,
-//     pub deleted_at: Option<DateTime<Utc>>,
-// }
+#[derive(Serialize, Deserialize)]
+pub struct User {
+    pub id: Uuid,
+    pub email: String,
+    pub password_hash: String,
+    pub deleted_at: Option<DateTime<Utc>>,
+}
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct List {
@@ -18,12 +18,6 @@ pub struct List {
     // pub created_by: Uuid,
     pub deleted_at: Option<DateTime<Utc>>,
 }
-
-// #[derive(Serialize, Deserialize)]
-// pub struct ListUser {
-//     pub list_id: Uuid,
-//     pub user_id: Uuid,
-// }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
