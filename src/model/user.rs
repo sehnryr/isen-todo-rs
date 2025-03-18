@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::server::SALT;
-use crate::util::password_hash::hash_password;
+use crate::util::password_hash::{hash_password, verify_password};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -17,11 +16,11 @@ impl User {
         Self {
             id: Uuid::new_v4(),
             username,
-            password_hash: hash_password(&password, SALT),
+            password_hash: hash_password(&password),
         }
     }
 
     pub fn verify_password(&self, password: &str) -> bool {
-        hash_password(password, SALT) == self.password_hash
+        verify_password(password, &self.password_hash)
     }
 }

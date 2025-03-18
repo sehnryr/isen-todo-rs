@@ -11,9 +11,6 @@ use crate::model::User;
 use crate::model::{List, Task};
 
 #[cfg(feature = "server")]
-pub const SALT: &str = "salt";
-
-#[cfg(feature = "server")]
 #[doc(hidden)]
 macro_rules! session {
     () => {
