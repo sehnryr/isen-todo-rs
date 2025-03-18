@@ -1,4 +1,3 @@
-mod error;
 mod model;
 #[cfg(feature = "server")]
 mod repository;
@@ -8,10 +7,9 @@ mod util;
 use chrono::NaiveDate;
 use dioxus::prelude::*;
 use dioxus_sdk::storage::*;
-use model::db::Task;
 use uuid::Uuid;
 
-use crate::model::db::List;
+use crate::model::{List, Task};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -36,16 +34,28 @@ fn main() {
 #[cfg(feature = "server")]
 #[tokio::main]
 async fn main() {
+    use std::any::Any;
+    use std::sync::Arc;
+
     use axum::Router;
+    use sqlx::SqlitePool;
     use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+
+    let pool = SqlitePool::connect("sqlite://todo.db").await.unwrap();
+    sqlx::migrate!("./migration").run(&pool).await.unwrap();
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
         .with_expiry(Expiry::OnSessionEnd);
 
+    let pool_provider = move || Box::new(pool.clone()) as Box<dyn Any>;
+
+    let config =
+        ServeConfigBuilder::default().context_providers(Arc::new(vec![Box::new(pool_provider)]));
+
     let router = Router::new()
-        .serve_dioxus_application(ServeConfigBuilder::default(), App)
+        .serve_dioxus_application(config, App)
         .layer(session_layer)
         .into_make_service();
 
@@ -130,8 +140,9 @@ fn Home() -> Element {
                     " "
                     button {
                         onclick: move |_| {
+                            let list_clone = list.clone();
                             async move {
-                                server::delete_list(list.id).await.expect("Failed to delete list");
+                                server::delete_list(list_clone).await.expect("Failed to delete list");
                                 update_lists().await;
                             }
                         },
@@ -194,10 +205,17 @@ fn Lists(id: Uuid) -> Element {
                         r#type: "checkbox",
                         checked: "{task.completed_at.is_some()}",
                         onchange: move |_| {
+                            let task_clone = task.clone();
                             async move {
-                                server::toggle_task_completion(task.id)
-                                    .await
-                                    .expect("Failed to update task");
+                                if task_clone.completed_at.is_none() {
+                                    server::complete_task(task_clone)
+                                        .await
+                                        .expect("Failed to complete task");
+                                } else {
+                                    server::uncomplete_task(task_clone)
+                                        .await
+                                        .expect("Failed to uncomplete task");
+                                }
                                 update_tasks().await;
                             }
                         },
@@ -210,7 +228,7 @@ fn Lists(id: Uuid) -> Element {
                     }
                     if let (Some(completed_at), Some(completed_by)) = (
                         task.completed_at,
-                        task.completed_by,
+                        task.completed_by.as_ref(),
                     )
                     {
                         div {
@@ -243,19 +261,18 @@ fn Lists(id: Uuid) -> Element {
                 onclick: move |event| {
                     event.prevent_default();
                     async move {
-                        if task_name.read().is_empty() {
+                        let task_name = task_name.read().clone();
+                        let due_date = due_date.read().clone();
+                        if task_name.is_empty() {
                             return;
                         }
-                        if due_date.read().is_empty() {
+                        if due_date.is_empty() {
                             return;
                         }
-                        let due_date = NaiveDate::parse_from_str(
-                                due_date.read().as_str(),
-                                "%Y-%m-%d",
-                            )
+                        let due_date = NaiveDate::parse_from_str(&due_date, "%Y-%m-%d")
                             .expect("Failed to parse due date");
                         let due_date = due_date.and_hms_opt(0, 0, 0).unwrap().and_utc();
-                        server::create_task(id, task_name.read().clone(), due_date)
+                        server::create_task(task_name, due_date, id)
                             .await
                             .expect("Failed to create list");
                         update_tasks().await;

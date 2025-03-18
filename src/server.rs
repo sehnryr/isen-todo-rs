@@ -1,115 +1,138 @@
-#[cfg(feature = "server")]
-use std::sync::{Arc, LazyLock};
-
 use chrono::{DateTime, Utc};
+use dioxus::prelude::*;
 #[cfg(feature = "server")]
-use parking_lot::Mutex;
+use sqlx::SqlitePool;
 #[cfg(feature = "server")]
 use tower_sessions::Session;
 use uuid::Uuid;
 
-use dioxus::prelude::*;
-
-use crate::model::db::{List, Task};
-// use crate::model::db::Session;
 #[cfg(feature = "server")]
-use crate::repository::Repository;
+use crate::model::User;
+use crate::model::{List, Task};
 
 #[cfg(feature = "server")]
 pub const SALT: &str = "salt";
 
 #[cfg(feature = "server")]
-static REPOSITORY: LazyLock<Arc<Mutex<Repository>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(Repository::new())));
+#[doc(hidden)]
+macro_rules! session {
+    () => {
+        extract::<Session, _>()
+    };
+}
+
+#[cfg(feature = "server")]
+#[doc(hidden)]
+macro_rules! pool {
+    () => {
+        async { extract().await.map(|FromContext::<SqlitePool>(pool)| pool) }
+    };
+}
 
 #[server]
 pub async fn login(username: String, password: String) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
+    let pool = pool!().await?;
+    let session = session!().await.unwrap();
 
-    let user = REPOSITORY.lock().get_user(username, password).await?;
+    let user = match User::get_user_by_username(&username, &pool).await? {
+        Some(user) => user,
+        None => return Err(ServerFnError::new("User not found")),
+    };
 
-    session.insert("id", user.id).await?;
+    if !user.verify_password(&password) {
+        return Err(ServerFnError::new("Invalid password"));
+    }
+
+    session.insert("user", user).await?;
 
     Ok(())
 }
 
 #[server]
 pub async fn register(username: String, password: String) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
+    let pool = pool!().await?;
+    let session = session!().await.unwrap();
 
-    let user = REPOSITORY.lock().insert_user(username, password).await?;
-
-    session.insert("id", user.id).await?;
+    let user = User::new(username, password);
+    user.insert_user(&pool).await?;
+    session.insert("user", user).await?;
 
     Ok(())
 }
 
 #[server]
 pub async fn logout() -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-
+    let session = session!().await.unwrap();
     session.delete().await?;
-
     Ok(())
 }
 
 #[server]
 pub async fn create_list(title: String) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+    let session = session!().await.unwrap();
+    let pool = pool!().await?;
 
-    REPOSITORY.lock().create_list(title, user_id).await?;
+    let user: User = session.get("user").await.unwrap().unwrap();
+    let list = List::new(title, user.id);
+
+    list.create_list(&pool).await?;
     Ok(())
 }
 
 #[server]
 pub async fn get_lists() -> Result<Vec<List>, ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+    let pool = pool!().await?;
+    let session = session!().await.unwrap();
 
-    let lists = REPOSITORY.lock().get_lists(user_id).await?;
+    let user: User = session.get("user").await.unwrap().unwrap();
+    let lists = List::get_user_lists(user.id, &pool).await?;
+
     Ok(lists)
 }
 
 #[server]
-pub async fn delete_list(id: Uuid) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
-
-    REPOSITORY.lock().delete_list(id, user_id).await?;
+pub async fn delete_list(list: List) -> Result<(), ServerFnError> {
+    let pool = pool!().await?;
+    list.delete_list(&pool).await?;
     Ok(())
 }
 
 #[server]
 pub async fn create_task(
-    list_id: Uuid,
     title: String,
     due_date: DateTime<Utc>,
+    list_id: Uuid,
 ) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+    let session = session!().await.unwrap();
+    let pool = pool!().await?;
 
-    REPOSITORY
-        .lock()
-        .create_task(list_id, title, due_date, user_id)
-        .await?;
+    let user: User = session.get("user").await.unwrap().unwrap();
+    let task = Task::new(title, due_date, list_id, user.id);
+
+    task.create_task(&pool).await?;
     Ok(())
 }
 
 #[server]
-pub async fn get_tasks(id: Uuid) -> Result<Vec<Task>, ServerFnError> {
-    let tasks = REPOSITORY.lock().get_list_tasks(id).await?;
+pub async fn get_tasks(list_id: Uuid) -> Result<Vec<Task>, ServerFnError> {
+    let pool = pool!().await?;
+    let tasks = Task::get_list_tasks(list_id, &pool).await?;
     Ok(tasks)
 }
 
 #[server]
-pub async fn toggle_task_completion(id: Uuid) -> Result<(), ServerFnError> {
-    let session = extract::<Session, _>().await.unwrap();
-    let user_id: Uuid = session.get("id").await.unwrap().unwrap();
+pub async fn complete_task(task: Task) -> Result<(), ServerFnError> {
+    let session = session!().await.unwrap();
+    let pool = pool!().await?;
 
-    REPOSITORY
-        .lock()
-        .toggle_task_completion(id, user_id)
-        .await?;
+    let user: User = session.get("user").await.unwrap().unwrap();
+    task.complete_task(user.id, &pool).await?;
+    Ok(())
+}
+
+#[server]
+pub async fn uncomplete_task(task: Task) -> Result<(), ServerFnError> {
+    let pool = pool!().await?;
+    task.uncomplete_task(&pool).await?;
     Ok(())
 }
